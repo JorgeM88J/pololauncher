@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,3 +26,10 @@ jobs:
         with:
           name: PoloLauncher-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publicar enlace directo (Release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk PoloLauncher.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest PoloLauncher.apk --title "Polo Launcher (última versión)" --notes "APK listo para instalar en la pantalla."
