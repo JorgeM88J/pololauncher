@@ -107,7 +107,18 @@ public class Store {
 
     public static int getKm(Context c) { return sp(c).getInt("km", 0); }
 
-    public static void setKm(Context c, int km) { sp(c).edit().putInt("km", km).apply(); }
+    /** Poner los km a mano (o al repostar) recalibra el contador del GPS: se descarta lo que llevara acumulado. */
+    public static void setKm(Context c, int km) { sp(c).edit().putInt("km", km).putFloat("kmRestM", 0f).apply(); }
+
+    /** Suma metros medidos por el GPS. Solo cuenta si ya hay km puestos (si no, no sabemos desde dónde). */
+    public static synchronized void addMeters(Context c, double m) {
+        SharedPreferences p = sp(c);
+        int km = p.getInt("km", 0);
+        if (km <= 0 || m <= 0) return;
+        double total = p.getFloat("kmRestM", 0f) + m;
+        int whole = (int) (total / 1000.0);
+        p.edit().putInt("km", km + whole).putFloat("kmRestM", (float) (total - whole * 1000.0)).apply();
+    }
 
     public static String getSlot(Context c, int i) { return sp(c).getString("slot" + i, null); }
 

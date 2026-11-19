@@ -162,7 +162,8 @@ public class FuelActivity extends Activity {
         f.euros = e;
         fills.add(f);
         Store.saveFuel(this, fills);
-        if (km > Store.getKm(this)) Store.setKm(this, km);
+        // Es el km real del cuentakilómetros: recalibra el contador del GPS (suba o baje).
+        Store.setKm(this, km);
         litE.setText("");
         eurE.setText("");
         Toast.makeText(this, fills.size() == 1 ? "Guardado: el primero solo sirve de punto de partida" : "Guardado", Toast.LENGTH_SHORT).show();

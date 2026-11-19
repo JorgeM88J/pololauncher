@@ -18,6 +18,9 @@ import android.view.WindowManager;
 public class IntroActivity extends Activity implements SurfaceHolder.Callback {
 
     static final long MAX_MS = 25000;
+    /** Para no abrirla dos veces seguidas (servicio y launcher a la vez). */
+    static boolean showing = false;
+    boolean owner = false;
 
     final Handler handler = new Handler(Looper.getMainLooper());
     MediaPlayer mp;
@@ -31,6 +34,13 @@ public class IntroActivity extends Activity implements SurfaceHolder.Callback {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        KmService.clearPendingIntro(this);
+        if (showing) {
+            finish();
+            return;
+        }
+        showing = true;
+        owner = true;
         getWindow().setBackgroundDrawable(new ColorDrawable(0xFF000000));
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().getDecorView().setSystemUiVisibility(
@@ -110,6 +120,7 @@ public class IntroActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     protected void onDestroy() {
+        if (owner) showing = false;
         handler.removeCallbacks(watchdog);
         release();
         super.onDestroy();

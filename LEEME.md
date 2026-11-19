@@ -35,8 +35,10 @@ Por ADB (con la unidad conectada al ordenador):
 
 ## Notas
 - Los intervalos de mantenimiento que vienen de serie (aceite 10.000 km, distribución 90.000 km / 5 años, etc.) son orientativos. Cámbialos por los de tu manual o tu taller.
-- Los km se ponen a mano (botón "Km actuales"). Sin ellos, los recordatorios por km no avisan.
+- Los km se cuentan solos con el GPS (versión 1.1), también con CarPlay delante. Hace falta poner una vez los km reales del cuentakilómetros (botón "Km actuales" en Recordatorios). Cada vez que apuntas un repostaje, los km de ese repostaje se toman como los buenos y el contador se recalibra. El GPS tiene un 1-3 % de error y en túneles o parkings puede perder algún tramo.
+- Para contar con CarPlay delante conviene dar a la ubicación «Permitir siempre» (la app lo pide una vez). Por ADB: `adb shell pm grant es.jorge.pololauncher android.permission.ACCESS_BACKGROUND_LOCATION`
+- El contador va en un servicio en primer plano (notificación fija "Contando km con el GPS"). Algunas unidades cierran servicios para ahorrar memoria: si los km dejan de subir, avísame.
 - Esta app no se ha podido probar en una unidad real antes de entregarla: si algo falla, dime qué ves.
 
 ## Vídeo de bienvenida
-Si existe el archivo `app/src/main/res/raw/intro.mp4`, la app lo reproduce a pantalla completa una vez cada vez que se enciende la unidad, y después muestra el inicio. Se salta tocando la pantalla. Si el vídeo falla o tarda demasiado (25 s), se cierra solo. Si el archivo no existe, la app arranca directa. El nombre tiene que ser exactamente `intro.mp4`, en minúsculas.
+Si existe el archivo `app/src/main/res/raw/intro.mp4`, la app lo reproduce a pantalla completa cada vez que se enciende la unidad y también cuando la pantalla vuelve a encenderse tras más de 3 minutos apagada (contacto quitado), y después muestra el inicio. Se salta tocando la pantalla. Si el vídeo falla o tarda demasiado (25 s), se cierra solo. Si el archivo no existe, la app arranca directa. El nombre tiene que ser exactamente `intro.mp4`, en minúsculas.

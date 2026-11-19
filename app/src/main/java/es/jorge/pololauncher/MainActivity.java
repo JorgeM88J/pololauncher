@@ -12,9 +12,11 @@ import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -49,7 +51,8 @@ public class MainActivity extends Activity {
     final SimpleDateFormat fM = new SimpleDateFormat("mm", Locale.US);
     final SimpleDateFormat fDate = new SimpleDateFormat("EEEE, d 'de' MMMM", new Locale("es", "ES"));
 
-    TextView clock, dateTv, sunTv, speedTv, dirTv, altTv, gpsTv;
+    TextView clock, dateTv, sunTv, speedTv, dirTv, altTv, gpsTv, kmTv;
+    int shownKm = -1;
     LinearLayout remList;
     final LinearLayout[] btn = new LinearLayout[SLOTS];
     final ImageView[] btnIcon = new ImageView[SLOTS];
@@ -102,7 +105,23 @@ public class MainActivity extends Activity {
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        } else {
+            askBackgroundLocationOnce();
         }
+    }
+
+    /**
+     * Para que el GPS siga contando km con CarPlay delante conviene "Permitir siempre".
+     * Se pide una sola vez; si se rechaza, cuenta igual mientras el servicio no se reinicie solo.
+     */
+    void askBackgroundLocationOnce() {
+        if (Build.VERSION.SDK_INT < 29) return;
+        if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) return;
+        SharedPreferences sp = Store.sp(this);
+        if (sp.getBoolean("askedBgLoc", false)) return;
+        sp.edit().putBoolean("askedBgLoc", true).apply();
+        Toast.makeText(this, "Para contar km con CarPlay abierto, elige «Permitir siempre»", Toast.LENGTH_LONG).show();
+        requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, 2);
     }
 
     /** El vídeo de bienvenida suena una vez por arranque de la unidad, y solo si existe res/raw/intro.mp4. */
@@ -112,7 +131,8 @@ public class MainActivity extends Activity {
         SharedPreferences sp = Store.sp(this);
         long saved = sp.getLong("introBoot", 0);
         if (Math.abs(boot - saved) > 120000) {
-            sp.edit().putLong("introBoot", boot).apply();
+            // Recién encendida la unidad: esta intro ya cuenta como la de "volver a encender".
+            sp.edit().putLong("introBoot", boot).remove("offWall").remove("offElapsed").apply();
             startActivity(new Intent(this, IntroActivity.class));
         }
     }
@@ -120,11 +140,26 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        KmService.start(this);
+        checkWakeIntro();
         startGps();
         refreshButtons();
         refreshReminders();
         handler.removeCallbacks(tick);
         handler.post(tick);
+    }
+
+    /** Si el servicio no pudo abrir la intro al encender la pantalla, se pone ahora. */
+    void checkWakeIntro() {
+        boolean play = KmService.takePendingIntro(this);
+        if (!play) {
+            // Por si Android cerró el servicio mientras la unidad dormía y no se enteró del encendido.
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null && pm.isInteractive() && KmService.offLongEnough(this)) play = true;
+        }
+        if (play && getResources().getIdentifier("intro", "raw", getPackageName()) != 0) {
+            startActivity(new Intent(this, IntroActivity.class));
+        }
     }
 
     @Override
@@ -138,6 +173,8 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
         super.onRequestPermissionsResult(code, perms, res);
         startGps();
+        KmService.start(this);
+        if (code == 1) askBackgroundLocationOnce();
     }
 
     @Override
@@ -197,9 +234,11 @@ public class MainActivity extends Activity {
         dirTv = Ui.tv(this, "Rumbo --", 22, Ui.GRAY, false);
         altTv = Ui.tv(this, "Altitud -- m", 22, Ui.GRAY, false);
         gpsTv = Ui.tv(this, "Buscando GPS…", 18, Ui.GRAY, false);
+        kmTv = Ui.tv(this, "", 18, Ui.GRAY, false);
         info.addView(dirTv);
         info.addView(altTv, Ui.lpm(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0, 0));
         info.addView(gpsTv, Ui.lpm(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0, 0));
+        info.addView(kmTv, Ui.lpm(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0, 0));
         speedCard.addView(info);
 
         LinearLayout remCard = new LinearLayout(this);
@@ -278,6 +317,14 @@ public class MainActivity extends Activity {
         sb.setSpan(new ForegroundColorSpan(Ui.ACC), hh.length(), hh.length() + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         clock.setText(sb);
         dateTv.setText(fDate.format(now));
+
+        int km = Store.getKm(this);
+        if (km != shownKm) {
+            // El servicio va sumando km: se refrescan los recordatorios por km.
+            if (shownKm >= 0) refreshReminders();
+            shownKm = km;
+            kmTv.setText(km > 0 ? Store.formatKm(km) + " km" : "Pon los km en Recordatorios");
+        }
 
         Calendar c = Calendar.getInstance(Store.TZ);
         c.setTimeInMillis(now);
