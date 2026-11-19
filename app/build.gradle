@@ -14,7 +14,20 @@ android {
         versionName '1.1'
     }
 
+    // Firma fija: así cada APK nuevo se instala encima del anterior sin perder los datos.
+    signingConfigs {
+        polo {
+            storeFile file('polo.keystore')
+            storePassword 'pololauncher'
+            keyAlias 'polo'
+            keyPassword 'pololauncher'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.polo
+        }
         release {
             minifyEnabled false
         }
