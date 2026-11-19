@@ -48,7 +48,7 @@ public class Store {
         add(l, "ITV", 12, 0);
         add(l, "Seguro", 12, 0);
         add(l, "Impuesto de circulación", 12, 0);
-        add(l, "Aceite y filtro", 12, 10000);
+        add(l, "Revisión (aceite y filtros)", 12, 10000);
         add(l, "Distribución (correa)", 60, 90000);
         add(l, "Filtro de aire", 24, 30000);
         add(l, "Bujías", 48, 60000);
@@ -60,12 +60,38 @@ public class Store {
     }
 
     public static List<Item> load(Context c) {
-        String j = sp(c).getString("reminders", null);
-        if (j == null) {
-            List<Item> d = defaults();
-            save(c, d);
-            return d;
+        List<Item> l = loadRaw(c);
+        if (!sp(c).getBoolean("migRevision137", false)) {
+            applyRevision(l);
+            save(c, l);
+            sp(c).edit().putBoolean("migRevision137", true).apply();
         }
+        return l;
+    }
+
+    /** La revisión de Jorge: próxima a los 137.000 km y luego cada 10.000 km (se aplica una sola vez). */
+    static void applyRevision(List<Item> l) {
+        Item rev = null;
+        for (Item it : l) {
+            String n = it.name.toLowerCase(Locale.ROOT);
+            if (n.startsWith("revisión") || n.startsWith("aceite")) {
+                rev = it;
+                break;
+            }
+        }
+        if (rev == null) {
+            rev = new Item();
+            rev.everyMonths = 12;
+            l.add(0, rev);
+        }
+        rev.name = "Revisión (aceite y filtros)";
+        rev.everyKm = 10000;
+        rev.nextKm = 137000;
+    }
+
+    static List<Item> loadRaw(Context c) {
+        String j = sp(c).getString("reminders", null);
+        if (j == null) return defaults();
         List<Item> out = new ArrayList<>();
         try {
             JSONArray a = new JSONArray(j);
